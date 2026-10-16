@@ -1,0 +1,211 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PO札読み計算機</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&family=Shippori+Mincho:wght@700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column of stacked ledger steps (①→⑦) flowing into a sticky result slip */
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --fg:#17203a; --muted:#5d6680; --line:#d9dded;
+  --accent:#1f3a8a; --gold:#a8791c; --good:#1d7a4f; --bad:#b4322e;
+  --f-display:"Shippori Mincho","Hiragino Mincho ProN",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1322; --card:#161d31; --fg:#e8ebf5; --muted:#9aa3bd; --line:#2a3350;
+  --accent:#8fa8ff; --gold:#e0b558; --good:#5fc894; --bad:#ff8a84; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1322; --card:#161d31; --fg:#e8ebf5; --muted:#9aa3bd; --line:#2a3350;
+  --accent:#8fa8ff; --gold:#e0b558; --good:#5fc894; --bad:#ff8a84; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:640px;margin:0 auto;display:grid;gap:14px}
+header h1{font-family:var(--f-display);font-size:1.6rem;margin:0;text-wrap:balance;letter-spacing:.02em}
+header p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{flex:1;min-width:84px;font:inherit;font-size:.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seglabel{font-size:.8rem;color:var(--muted);margin:0 0 -6px}
+section.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
+section.step h2{margin:0;font-size:.95rem;display:flex;gap:8px;align-items:baseline}
+section.step h2 b{font-family:var(--f-display);color:var(--gold);font-size:1.1rem}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:grid;gap:4px;min-width:0}
+.row label{display:flex;justify-content:space-between;gap:6px;font-size:.85rem;color:var(--muted)}
+.row label output{font-family:var(--f-num);color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number],input[type=text]{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+input[type=number]{font-family:var(--f-num)}
+.sub{font-size:.8rem;color:var(--muted);margin:0}
+.sub span{font-family:var(--f-num);color:var(--fg)}
+.note{font-size:.75rem;color:var(--muted);margin:0}
+.result{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:14px;display:grid;gap:8px;box-shadow:0 6px 20px rgba(20,30,70,.15)}
+.result h3{margin:0;font-size:.85rem;color:var(--gold)}
+.big{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.big .k{font-size:.85rem;color:var(--muted)}
+.big .v{font-family:var(--f-num);font-size:1.6rem;color:var(--accent);font-variant-numeric:tabular-nums}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.grid3 div{background:var(--bg);border-radius:6px;padding:6px 2px}
+.grid3 small{display:block;font-size:.7rem;color:var(--muted)}
+.grid3 span{font-family:var(--f-num);font-size:.85rem;font-variant-numeric:tabular-nums}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+footer{font-size:.75rem;color:var(--muted)}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>PO札読み計算機</h1>
+  <p>どの銘柄でも、ネット抽選で何株来るかを推定します。初期値はCKD(6407)の例です。</p>
+</header>
+
+<section class="step">
+  <h2><b>①</b>銘柄と自分の申込</h2>
+  <div class="two">
+    <div class="row"><label for="name">銘柄名・コード</label><input type="text" id="name" value="CKD 6407"></div>
+    <div class="row"><label for="broker">申込先の証券会社</label><input type="text" id="broker" value="SMBC日興"></div>
+  </div>
+  <div class="two">
+    <div class="row"><label for="price">株価（円）</label><input type="number" id="price" value="5060" step="10" inputmode="decimal"></div>
+    <div class="row"><label for="apply">申込株数</label><input type="number" id="apply" value="20000" step="100" inputmode="numeric"></div>
+  </div>
+  <div class="row"><label for="disc">ディスカウント率 <output id="o_disc"></output></label><input type="range" id="disc" min="1" max="8" step="0.5" value="5"></div>
+  <p class="sub">PO価格 <span id="r_po"></span></p>
+</section>
+
+<section class="step">
+  <h2><b>②</b>案件の規模</h2>
+  <div class="two">
+    <div class="row"><label for="total">公募＋売出株数</label><input type="number" id="total" value="3570800" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="oa">OA株数</label><input type="number" id="oa" value="535500" step="100" inputmode="numeric"></div>
+  </div>
+  <p class="note">目論見書やPO情報サイトの数字を入れてください。OAは主幹事だけが扱う前提です。</p>
+</section>
+
+<section class="step">
+  <h2><b>③</b>申込先の立場</h2>
+  <div class="seg" id="role" role="group" aria-label="申込先の立場">
+    <button data-share="55" data-lead="1">主幹事</button>
+    <button data-share="30" data-lead="0" class="on">共同主幹事</button>
+    <button data-share="5" data-lead="0">副幹事・その他</button>
+  </div>
+  <div class="row"><label for="share">引受シェア <output id="o_share"></output></label><input type="range" id="share" min="1" max="80" step="1" value="30"></div>
+  <p class="sub"><span id="r_bname"></span>に来る株数 <span id="r_nikko"></span></p>
+</section>
+
+<section class="step">
+  <h2><b>④</b>個人・支店・ネットの配分</h2>
+  <div class="row"><label for="retail">個人向けの割合 <output id="o_retail"></output></label><input type="range" id="retail" min="30" max="90" step="5" value="60"></div>
+  <div class="row"><label for="online">個人分のうちネット抽選 <output id="o_online"></output></label><input type="range" id="online" min="5" max="100" step="1" value="10"></div>
+  <p class="note">ネット専業の証券会社なら100%に近づけてください。</p>
+  <p class="sub">支店 <span id="r_branch"></span> ／ ネット <span id="r_net"></span></p>
+</section>
+
+<section class="step">
+  <h2><b>⑤</b>支店の売れ残り（顧客層）</h2>
+  <div class="row"><label for="unsold">補欠に回る割合 <output id="o_unsold"></output></label><input type="range" id="unsold" min="0" max="40" step="1" value="0"></div>
+  <p class="sub">補欠に回る株数 <span id="r_spill"></span></p>
+</section>
+
+<section class="step">
+  <h2><b>⑥</b>ネットの申込需要</h2>
+  <p class="seglabel">シナリオ</p>
+  <div class="seg" id="scen" role="group" aria-label="シナリオ">
+    <button data-p="hot">人気</button>
+    <button data-p="mid" class="on">普通</button>
+    <button data-p="cold">不人気</button>
+  </div>
+  <div class="row"><label for="people">申込人数 <output id="o_people"></output></label><input type="range" id="people" min="100" max="10000" step="100" value="2000"></div>
+  <div class="row"><label for="avg">平均申込株数 <output id="o_avg"></output></label><input type="range" id="avg" min="100" max="5000" step="100" value="1000"></div>
+  <p class="sub">需要合計 <span id="r_demand"></span></p>
+</section>
+
+<section class="step">
+  <h2><b>⑦</b>当選後の辞退（繰り上げ）</h2>
+  <div class="row"><label for="decline">辞退率 <output id="o_decline"></output></label><input type="range" id="decline" min="0" max="40" step="1" value="10"></div>
+  <p class="note">ディスカウント率を動かすと目安が自動で入ります（4%で15%、6%で5%）。手動で上書きできます。</p>
+  <p class="sub">繰り上げで増える株数 <span id="r_extra"></span></p>
+</section>
+
+<div class="result" aria-live="polite">
+  <h3 id="r_title"></h3>
+  <div class="big"><span class="k">配分率</span><span class="v" id="r_ratio"></span></div>
+  <div class="big"><span class="k">予想配分</span><span class="v" id="r_mine"></span></div>
+  <p class="sub">購入金額 <span id="r_cost"></span></p>
+  <div class="grid3">
+    <div><small>5%下落</small><span id="r_m5" class="neg"></span></div>
+    <div><small>3%下落</small><span id="r_m3" class="neg"></span></div>
+    <div><small>3%上昇</small><span id="r_p3" class="pos"></span></div>
+  </div>
+</div>
+
+<footer>配分率＝（ネット抽選分＋支店の売れ残り）×（1＋辞退率）÷ネット需要。予想配分は100株未満切り捨て。損益はPO価格基準。数字はすべて仮定で、投資判断はご自身で。</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const man=n=>(n/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万円';
+let isLead=false;
+const presets={hot:{people:4000,avg:1000,unsold:0},mid:{people:2000,avg:1000,unsold:0},cold:{people:1000,avg:800,unsold:17}};
+function declineFromDisc(d){ // 4%→15, 6%→5, linear, clamped
+  return Math.max(0,Math.min(40,Math.round(15-(d-4)*5)));
+}
+function calc(){
+  const price=+$('price').value||0, disc=+$('disc').value, apply=+$('apply').value||0;
+  const total=+$('total').value||0, oa=+$('oa').value||0, share=+$('share').value/100;
+  const retail=+$('retail').value/100, online=+$('online').value/100, unsold=+$('unsold').value/100;
+  const people=+$('people').value, avg=+$('avg').value, decline=+$('decline').value/100;
+  const po=Math.floor(price*(1-disc/100));
+  const mine_alloc=total*share+(isLead?oa:0);
+  const ret=mine_alloc*retail, net=ret*online, branch=ret-net, spill=branch*unsold;
+  const base=net+spill, extra=base*decline, pool=base+extra, demand=people*avg;
+  const ratio=demand>0?Math.min(1,pool/demand):0;
+  const mine=Math.floor(apply*ratio/100)*100, cost=mine*po;
+  const bname=$('broker').value.trim()||'申込先';
+  $('o_disc').textContent=disc.toFixed(1)+'%';
+  $('o_share').textContent=$('share').value+'%';
+  $('o_retail').textContent=$('retail').value+'%';
+  $('o_online').textContent=$('online').value+'%';
+  $('o_unsold').textContent=$('unsold').value+'%';
+  $('o_people').textContent=fmt(people)+'人';
+  $('o_avg').textContent=fmt(avg)+'株';
+  $('o_decline').textContent=$('decline').value+'%';
+  $('r_po').textContent=fmt(po)+'円';
+  $('r_bname').textContent=bname;
+  $('r_nikko').textContent=fmt(mine_alloc)+'株'+(isLead&&oa?'（OA込み）':'');
+  $('r_branch').textContent=fmt(branch)+'株';
+  $('r_net').textContent=fmt(net)+'株';
+  $('r_spill').textContent=fmt(spill)+'株';
+  $('r_demand').textContent=fmt(demand)+'株';
+  $('r_extra').textContent=fmt(extra)+'株';
+  $('r_title').textContent=($('name').value.trim()||'銘柄')+' ／ '+bname;
+  $('r_ratio').textContent=(ratio*100).toFixed(1)+'%';
+  $('r_mine').textContent=fmt(mine)+'株';
+  $('r_cost').textContent=man(cost);
+  $('r_m5').textContent='−'+man(cost*.05);
+  $('r_m3').textContent='−'+man(cost*.03);
+  $('r_p3').textContent='+'+man(cost*.03);
+}
+function clearOn(group){document.querySelectorAll('#'+group+' button').forEach(b=>b.classList.remove('on'));}
+document.querySelectorAll('input').forEach(i=>i.addEventListener('input',e=>{
+  const id=e.target.id;
+  if(id==='disc'){$('decline').value=declineFromDisc(+$('disc').value);}
+  if(['people','avg','unsold'].includes(id)) clearOn('scen');
+  if(id==='share') clearOn('role');
+  calc();
+}));
+document.querySelectorAll('#scen button').forEach(b=>b.addEventListener('click',()=>{
+  const p=presets[b.dataset.p];
+  $('people').value=p.people;$('avg').value=p.avg;$('unsold').value=p.unsold;
+  clearOn('scen');b.classList.add('on');calc();
+}));
+document.querySelectorAll('#role button').forEach(b=>b.addEventListener('click',()=>{
+  $('share').value=b.dataset.share;isLead=b.dataset.lead==='1';
+  clearOn('role');b.classList.add('on');calc();
+}));
+$('decline').value=declineFromDisc(+$('disc').value);
+calc();
+</script>
+
+</body></html>
