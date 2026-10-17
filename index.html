@@ -100,8 +100,9 @@ footer{font-size:.75rem;color:var(--muted)}
   <div class="two">
     <div class="row"><label for="broker">申込先の証券会社</label>
       <select id="broker">
+        <option value="" data-net="" selected>（選択してください）</option>
         <optgroup label="対面系">
-          <option data-net="10" selected>野村證券</option>
+          <option data-net="10">野村證券</option>
           <option data-net="10">大和証券</option>
           <option data-net="10">SMBC日興証券</option>
           <option data-net="10">みずほ証券</option>
@@ -136,7 +137,8 @@ footer{font-size:.75rem;color:var(--muted)}
     <div class="row"><label for="total">公募＋売出株数</label><div class="numwrap"><button type="button" class="stp" data-for="total" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="total" value="3,000,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="total" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_total"></p></div>
     <div class="row"><label for="oa">OA株数</label><div class="numwrap"><button type="button" class="stp" data-for="oa" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="oa" value="450,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="oa" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_oa"></p></div>
   </div>
-  <p class="note">目論見書やPO情報サイトの数字を入れてください。OAは主幹事だけが扱う前提です。</p>
+  <p class="sub">合計（OA込み） <span id="r_sum"></span> ／ 案件総額 <span id="r_size"></span></p>
+  <p class="note">目論見書やPO情報サイトの数字を入れてください。OAは主幹事だけが扱う前提です。総額はPO価格で計算しています。</p>
 </section>
 
 <section class="step">
@@ -358,6 +360,9 @@ function calc(){
   $('o_avg').textContent=fmt(avg)+'株';
   $('o_decline').textContent=$('decline').value+'%';
   $('r_po').textContent=fmt(po)+'円';
+  const sum=total+oa, size=sum*po;
+  $('r_sum').textContent=fmt(sum)+'株（'+kanji(sum)+'株）';
+  $('r_size').textContent=size>=1e8?'約'+(size/1e8).toLocaleString('ja-JP',{maximumFractionDigits:1})+'億円':man(size);
   $('r_bname').textContent=bname;
   $('r_nikko').textContent=fmt(mine_alloc)+'株'+(isLead&&oa?'（OA込み）':'');
   $('r_branch').textContent=fmt(branch)+'株';
