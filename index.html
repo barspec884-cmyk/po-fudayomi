@@ -28,6 +28,16 @@ header p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
 .seg{display:flex;gap:8px;flex-wrap:wrap}
 .seg button{flex:1;min-width:84px;font:inherit;font-size:.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
 .seg button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+#slots{display:flex;gap:8px}
+#slots .slot{flex:1;min-width:0;position:relative}
+#slots .pick{width:100%;display:grid;gap:0;line-height:1.3;overflow:hidden;font:inherit;font-size:.85rem;padding:8px 26px 8px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;text-align:left}
+#slots .pick.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+#slots .pick.empty{color:var(--muted);padding-right:8px;text-align:center}
+#slots .pick .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#slots .pick small{font-size:.7rem;color:var(--muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#slots .del{position:absolute;top:50%;right:4px;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--muted);font-size:1rem;line-height:1;cursor:pointer;padding:0}
+#slots .del:hover{color:var(--bad);border-color:var(--bad)}
+#slots .del[hidden]{display:none}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .seglabel{font-size:.8rem;color:var(--muted);margin:0 0 -6px}
 section.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
@@ -63,6 +73,17 @@ footer{font-size:.75rem;color:var(--muted)}
   <h1>PO札読み計算機</h1>
   <p>どの銘柄でも、ネット抽選で何株来るかを推定します。初期値は架空の例です。</p>
 </header>
+
+<section class="step">
+  <h2><b>★</b>保存枠（3銘柄まで）</h2>
+  <div id="slots" role="group" aria-label="保存枠">
+    <div class="slot" data-i="0"><button type="button" class="pick"></button><button type="button" class="del" title="この銘柄を削除">×</button></div>
+    <div class="slot" data-i="1"><button type="button" class="pick"></button><button type="button" class="del" title="この銘柄を削除">×</button></div>
+    <div class="slot" data-i="2"><button type="button" class="pick"></button><button type="button" class="del" title="この銘柄を削除">×</button></div>
+  </div>
+  <p class="note" id="slotInfo"></p>
+  <p class="note">入力した内容は自動でこのブラウザに保存され、次に開いたときもそのまま残ります。各枠の「×」でその銘柄だけ削除できます。スマホとパソコンでは別々に保存されます。</p>
+</section>
 
 <section class="step">
   <h2><b>①</b>銘柄と自分の申込</h2>
@@ -178,6 +199,70 @@ const fmt=n=>Math.round(n).toLocaleString('ja-JP');
 const man=n=>(n/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万円';
 let isLead=true;
 const presets={hot:{people:4000,avg:1000,unsold:0},mid:{people:2000,avg:1000,unsold:0},cold:{people:1000,avg:800,unsold:17}};
+
+/* ===== 保存まわり（ブラウザ内に3枠ぶん保存） ===== */
+const KEY='po-calc-slots-v1';
+const FIELDS=['name','code','broker','brokerOther','price','apply','disc','total','oa','share','retail','online','unsold','people','avg','decline'];
+let loading=false, storageOK=true;
+function readStore(){
+  try{
+    const s=JSON.parse(localStorage.getItem(KEY));
+    if(s&&Array.isArray(s.slots)&&s.slots.length===3) return {cur:(s.cur>=0&&s.cur<3)?s.cur:0,slots:s.slots};
+  }catch(e){storageOK=false;}
+  return {cur:0,slots:[null,null,null]};
+}
+function writeStore(){
+  try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){storageOK=false;}
+}
+function getState(){
+  const f={}; FIELDS.forEach(id=>f[id]=$(id).value);
+  const role=[...document.querySelectorAll('#role button')].findIndex(b=>b.classList.contains('on'));
+  const sc=document.querySelector('#scen button.on');
+  return {f,isLead,role,scen:sc?sc.dataset.p:'',savedAt:Date.now()};
+}
+function setState(s){
+  loading=true;
+  FIELDS.forEach(id=>{if(s.f&&s.f[id]!==undefined)$(id).value=s.f[id];});
+  $('otherRow').hidden=$('broker').value!=='__other';
+  isLead=!!s.isLead;
+  const roles=document.querySelectorAll('#role button');
+  clearOn('role'); if(s.role>=0&&roles[s.role]) roles[s.role].classList.add('on');
+  clearOn('scen'); const sb=s.scen&&document.querySelector('#scen button[data-p="'+s.scen+'"]'); if(sb) sb.classList.add('on');
+  calc();
+  loading=false;
+  renderSlots();
+}
+function persist(){
+  if(loading) return;
+  store.slots[store.cur]=getState();
+  writeStore();
+  renderSlots();
+}
+function slotTitle(i){
+  const s=store.slots[i];
+  return s?((s.f.name||'').trim()||'銘柄'+(i+1)):'';
+}
+function renderSlots(){
+  document.querySelectorAll('#slots .slot').forEach((el,i)=>{
+    const s=store.slots[i], b=el.querySelector('.pick'), del=el.querySelector('.del');
+    const title=s?slotTitle(i):'空き';
+    const sub=s?((s.f.code||'').trim()||'—'):'枠'+(i+1);
+    b.innerHTML='';
+    const t=document.createElement('span'); t.className='t'; t.textContent=title; b.append(t);
+    const sm=document.createElement('small'); sm.textContent=sub; b.append(sm);
+    b.classList.toggle('on',i===store.cur);
+    b.classList.toggle('empty',!s);
+    del.hidden=!s;
+    del.setAttribute('aria-label',title+'を削除');
+  });
+  const s=store.slots[store.cur];
+  $('slotInfo').textContent=!storageOK
+    ?'このブラウザでは保存できない設定になっています（プライベートモード等）。'
+    :s?'最終保存：'+new Date(s.savedAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
+      :'この枠はまだ空です。入力を始めると自動で保存されます。';
+}
+
+/* ===== 計算 ===== */
 function declineFromDisc(d){ // 4%→15, 6%→5, linear, clamped
   return Math.max(0,Math.min(40,Math.round(15-(d-4)*5)));
 }
@@ -217,6 +302,7 @@ function calc(){
   $('r_m5').textContent='−'+man(cost*.05);
   $('r_m3').textContent='−'+man(cost*.03);
   $('r_p3').textContent='+'+man(cost*.03);
+  persist();
 }
 function brokerName(){
   const sel=$('broker');
@@ -245,8 +331,28 @@ document.querySelectorAll('#role button').forEach(b=>b.addEventListener('click',
   $('share').value=b.dataset.share;isLead=b.dataset.lead==='1';
   clearOn('role');b.classList.add('on');calc();
 }));
+
+/* ===== 保存枠の操作 ===== */
+document.querySelectorAll('#slots .slot').forEach(el=>{
+  const i=+el.dataset.i;
+  el.querySelector('.pick').addEventListener('click',()=>{
+    store.cur=i; writeStore();
+    setState(store.slots[i]||DEFAULTS);
+  });
+  el.querySelector('.del').addEventListener('click',()=>{
+    if(!store.slots[i]) return;
+    if(!confirm('「'+slotTitle(i)+'」を削除しますか？')) return;
+    store.slots[i]=null; writeStore();
+    if(i===store.cur) setState(DEFAULTS); // 表示中の枠なら初期値に戻す
+    else renderSlots();                   // 他の枠なら表示はそのまま
+  });
+});
+
+/* ===== 起動時 ===== */
 $('decline').value=declineFromDisc(+$('disc').value);
-calc();
+const DEFAULTS=getState();
+let store=readStore();
+setState(store.slots[store.cur]||DEFAULTS);
 </script>
 </body>
 </html>
