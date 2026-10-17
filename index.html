@@ -49,7 +49,13 @@ section.step h2 b{font-family:var(--f-display);color:var(--gold);font-size:1.1re
 .row label output{font-family:var(--f-num);color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
 input[type=range]{width:100%;accent-color:var(--accent)}
 input[type=number],input[type=text],select{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
-input[type=number]{font-family:var(--f-num)}
+input[type=number],input.num{font-family:var(--f-num);text-align:right}
+.numwrap{display:grid;grid-template-columns:34px minmax(0,1fr) 34px;gap:4px}
+.stp{font:inherit;font-size:1.05rem;line-height:1;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--accent);cursor:pointer;padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.stp:active{background:var(--line)}
+.hint{font-size:.75rem;color:var(--muted);margin:0;text-align:right;min-height:1.2em}
+.hint b{color:var(--fg);font-weight:700}
+.hint.warn,.hint.warn b{color:var(--bad)}
 .sub{font-size:.8rem;color:var(--muted);margin:0}
 .sub span{font-family:var(--f-num);color:var(--fg)}
 .note{font-size:.75rem;color:var(--muted);margin:0}
@@ -117,8 +123,8 @@ footer{font-size:.75rem;color:var(--muted)}
   </div>
   <p class="note">証券会社を選ぶと、④のネット抽選の割合に目安が入ります（対面系10%、ネット系100%）。</p>
   <div class="two">
-    <div class="row"><label for="price">株価（円）</label><input type="number" id="price" value="3000" step="10" inputmode="decimal"></div>
-    <div class="row"><label for="apply">申込株数</label><input type="number" id="apply" value="1000" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="price">株価（円）</label><div class="numwrap"><button type="button" class="stp" data-for="price" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="price" value="3,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="price" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_price"></p></div>
+    <div class="row"><label for="apply">申込株数</label><div class="numwrap"><button type="button" class="stp" data-for="apply" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="apply" value="1,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="apply" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_apply"></p></div>
   </div>
   <div class="row"><label for="disc">ディスカウント率 <output id="o_disc"></output></label><input type="range" id="disc" min="1" max="8" step="0.5" value="5"></div>
   <p class="sub">PO価格 <span id="r_po"></span></p>
@@ -127,8 +133,8 @@ footer{font-size:.75rem;color:var(--muted)}
 <section class="step">
   <h2><b>②</b>案件の規模</h2>
   <div class="two">
-    <div class="row"><label for="total">公募＋売出株数</label><input type="number" id="total" value="3000000" step="100" inputmode="numeric"></div>
-    <div class="row"><label for="oa">OA株数</label><input type="number" id="oa" value="450000" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="total">公募＋売出株数</label><div class="numwrap"><button type="button" class="stp" data-for="total" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="total" value="3,000,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="total" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_total"></p></div>
+    <div class="row"><label for="oa">OA株数</label><div class="numwrap"><button type="button" class="stp" data-for="oa" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="oa" value="450,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="oa" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_oa"></p></div>
   </div>
   <p class="note">目論見書やPO情報サイトの数字を入れてください。OAは主幹事だけが扱う前提です。</p>
 </section>
@@ -200,6 +206,69 @@ const man=n=>(n/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万円
 let isLead=true;
 const presets={hot:{people:4000,avg:1000,unsold:0},mid:{people:2000,avg:1000,unsold:0},cold:{people:1000,avg:800,unsold:17}};
 
+/* ===== 数字欄：カンマ自動挿入・全角数字OK・漢字表記 ===== */
+const NUMS={price:'円',apply:'株',total:'株',oa:'株'};
+const toHalf=s=>String(s).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const digits=s=>toHalf(s).replace(/\D/g,'');
+const num=id=>+digits($(id).value)||0;
+const STEP={price:10,apply:100,total:10000,oa:10000};
+const group=d=>d.replace(/\B(?=(\d{3})+(?!\d))/g,',');
+function formatNum(el,keepCaret){
+  const v=el.value, pos=el.selectionStart??v.length;
+  const before=digits(v.slice(0,pos)).length;        // カーソルより前の数字の数
+  let d=digits(v);
+  if(!keepCaret) d=d.replace(/^0+(?=\d)/,'');        // 先頭の0は入力が終わってから整理
+  const out=group(d);
+  if(out===v) return;
+  el.value=out;
+  if(keepCaret&&document.activeElement===el){       // カーソル位置を数字の数で復元
+    let p=0,c=0; while(p<out.length&&c<before){if(/\d/.test(out[p]))c++;p++;}
+    el.setSelectionRange(p,p);
+  }
+}
+function kanji(n){ // 3000000 → 300万 / 123456789 → 1億2345万6789
+  n=Math.floor(n); if(n<10000) return n.toLocaleString('ja-JP');
+  const oku=Math.floor(n/1e8), man=Math.floor(n%1e8/1e4), rest=n%1e4;
+  return (oku?oku+'億':'')+(man?man+'万':'')+(rest?rest:'');
+}
+function updateHints(){
+  Object.entries(NUMS).forEach(([id,unit])=>{
+    const h=$('h_'+id), n=num(id);
+    h.className='hint'; h.textContent='';
+    if(!digits($(id).value)){h.classList.add('warn');h.textContent='数字を入れてください';return;}
+    const b=document.createElement('b'); b.textContent=kanji(n)+unit; h.append('＝',b);
+    if(id==='apply'&&n%100!==0){h.classList.add('warn');h.append('（100株単位で）');}
+  });
+}
+Object.keys(NUMS).forEach(id=>{
+  const el=$(id);
+  el.addEventListener('keydown',e=>{ // カンマ上でBackspace/Deleteしたら、隣の数字を消す
+    const s=el.selectionStart, t=el.selectionEnd;
+    if(s!==t) return;
+    if(e.key==='Backspace'&&el.value[s-1]===',') el.setSelectionRange(s-1,s-1);
+    if(e.key==='Delete'&&el.value[s]===',') el.setSelectionRange(s+1,s+1);
+  });
+  el.addEventListener('input',e=>{if(!e.isComposing) formatNum(el,true);});
+  el.addEventListener('compositionend',()=>{formatNum(el,true);calc();}); // 日本語入力ONで打った時
+  el.addEventListener('blur',()=>{formatNum(el,false);calc();});
+});
+/* −／＋ボタン（押しっぱなしで連続） */
+function bump(id,dir){
+  const st=STEP[id]; let n=num(id)+dir*st;
+  n=Math.max(0,Math.round(n/st)*st);
+  $(id).value=group(String(n)); calc();
+}
+document.querySelectorAll('.stp').forEach(b=>{
+  let timer=null, rep=null;
+  const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null;};
+  b.addEventListener('pointerdown',e=>{
+    e.preventDefault(); bump(b.dataset.for,+b.dataset.d);
+    timer=setTimeout(()=>{rep=setInterval(()=>bump(b.dataset.for,+b.dataset.d),90);},450);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,stop));
+  b.addEventListener('click',e=>{if(e.detail===0) bump(b.dataset.for,+b.dataset.d);}); // キーボード操作用
+});
+
 /* ===== 保存まわり（ブラウザ内に3枠ぶん保存） ===== */
 const KEY='po-calc-slots-v1';
 const FIELDS=['name','code','broker','brokerOther','price','apply','disc','total','oa','share','retail','online','unsold','people','avg','decline'];
@@ -223,6 +292,7 @@ function getState(){
 function setState(s){
   loading=true;
   FIELDS.forEach(id=>{if(s.f&&s.f[id]!==undefined)$(id).value=s.f[id];});
+  Object.keys(NUMS).forEach(id=>formatNum($(id),false));
   $('otherRow').hidden=$('broker').value!=='__other';
   isLead=!!s.isLead;
   const roles=document.querySelectorAll('#role button');
@@ -267,8 +337,9 @@ function declineFromDisc(d){ // 4%→15, 6%→5, linear, clamped
   return Math.max(0,Math.min(40,Math.round(15-(d-4)*5)));
 }
 function calc(){
-  const price=+$('price').value||0, disc=+$('disc').value, apply=+$('apply').value||0;
-  const total=+$('total').value||0, oa=+$('oa').value||0, share=+$('share').value/100;
+  const price=num('price'), disc=+$('disc').value, apply=num('apply');
+  const total=num('total'), oa=num('oa'), share=+$('share').value/100;
+  updateHints();
   const retail=+$('retail').value/100, online=+$('online').value/100, unsold=+$('unsold').value/100;
   const people=+$('people').value, avg=+$('avg').value, decline=+$('decline').value/100;
   const po=Math.floor(price*(1-disc/100));
