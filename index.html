@@ -72,6 +72,26 @@ input[type=number],input.num{font-family:var(--f-num);text-align:right}
 .grid3 span{font-family:var(--f-num);font-size:.85rem;font-variant-numeric:tabular-nums}
 .neg{color:var(--bad)} .pos{color:var(--good)}
 footer{font-size:.75rem;color:var(--muted)}
+/* ===== 読み方メモ（折りたたみ） ===== */
+.memo{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:8px}
+.memo>h2{margin:0;font-size:.95rem;display:flex;gap:8px;align-items:baseline}
+.memo>h2 b{font-family:var(--f-display);color:var(--gold);font-size:1.1rem}
+.memo details{border-top:1px solid var(--line);padding-top:8px}
+.memo summary{cursor:pointer;font-weight:700;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;gap:8px}
+.memo summary::-webkit-details-marker{display:none}
+.memo summary::after{content:"＋";color:var(--accent);font-weight:400}
+.memo details[open] summary::after{content:"−"}
+.memo summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.memo .body{display:grid;gap:8px;margin-top:8px;font-size:.85rem}
+.memo .lead{margin:0;font-weight:700;color:var(--accent)}
+.memo ul,.memo ol{margin:0;padding-left:1.3em;display:grid;gap:4px}
+.memo .pair{display:grid;gap:6px}
+.memo .pair div{background:var(--bg);border-radius:8px;padding:8px 10px}
+.memo .pair dt{font-weight:700;font-size:.8rem;margin:0}
+.memo .pair dd{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
+.memo .pair dd b{color:var(--fg)}
+.memo .ng{color:var(--bad);font-weight:700}
+.memo .ok{color:var(--good);font-weight:700}
 </style>
 </head>
 <body>
@@ -199,6 +219,86 @@ footer{font-size:.75rem;color:var(--muted)}
     <div><small>3%上昇</small><span id="r_p3" class="pos"></span></div>
   </div>
 </div>
+
+<section class="memo" aria-labelledby="memoTitle">
+  <h2 id="memoTitle"><b>※</b>需給の読み方メモ（注意点）</h2>
+  <p class="note">タップで開きます。どの銘柄のPOにも共通する一般的な注意点です。</p>
+
+  <details>
+    <summary>① OAとシンジケートカバーの仕組み</summary>
+    <div class="body">
+      <p class="lead">OAは、主幹事が株を借りて売る「保険付きのショート」です。</p>
+      <ol>
+        <li>主幹事が既存株主から株を借りる（OAの上限株数まで）</li>
+        <li>それをPO価格で投資家に売る（この時点で主幹事はショート）</li>
+        <li>後で返すために、安い方の方法を選ぶ</li>
+      </ol>
+      <dl class="pair">
+        <div><dt>株価がPO価格より<span class="ok">上</span></dt><dd>グリーンシュー（売出人からPO価格で買う）で返す → <b>市場での買いなし</b>。後で「シンジケートカバー少ない・0」と発表</dd></div>
+        <div><dt>株価がPO価格より<span class="ng">下</span></dt><dd>市場で買い戻して返す（シンジケートカバー取引） → <b>主幹事の買いが下支え</b>。後で「シンジケートカバー多い」と発表</dd></div>
+      </dl>
+      <ul>
+        <li>買い戻しは「上げるエンジン」ではなく「下がった時のクッション」</li>
+        <li>いつ・いくらで・何株買うかは主幹事の判断。約束ではない</li>
+        <li>主幹事の本業の収入は引受手数料（引受価額と売出価格の差）。OAはおまけ程度で、売れ残りのリスクは主幹事が背負う</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>② 読むべきサイン</summary>
+    <div class="body">
+      <p class="lead">人気の強弱は、価格決定日のOA株数とディスカウント率で最初にわかります。</p>
+      <dl class="pair">
+        <div><dt>OA株数</dt><dd>価格決定日の夕方、TDnet「売出価格等の決定に関するお知らせ」。<b>上限のまま＝人気あり／減る・0＝需要が弱い</b></dd></div>
+        <div><dt>ディスカウント率</dt><dd>同上。<b>下限寄り＝人気あり／上限寄り＝需要が弱い</b></dd></div>
+        <div><dt>PO価格</dt><dd>この先の基準線。チャートに線を引く。少し下は主幹事の買い戻しが入りやすい</dd></div>
+        <div><dt>引受価額</dt><dd>同上の開示に載る。売出価格との差＝証券会社の手数料</dd></div>
+        <div><dt>信用売残</dt><dd>毎週火曜（前週金曜分）：株探・Yahoo!ファイナンス。日次は株探・日証金。<b>PO発表後の急増＝つなぎ売り</b>。落選者の買い戻しが反発の燃料になりうる</dd></div>
+        <div><dt>自社株買いの進み具合</dt><dd>毎月初め、TDnet「自己株式の取得状況に関するお知らせ」。<b>遅い＝下支えが弱い</b></dd></div>
+        <div><dt>シンジケートカバー結果</dt><dd>期間終了後（早く終われば早めに）、TDnet。株数のみで価格は出ない。<b>買い戻し多い＝期間中は弱かった</b></dd></div>
+      </dl>
+      <ul>
+        <li>つなぎ売りした人のうち、当選者はPO株で返すので市場では買わない。落選者は市場で買い戻す</li>
+        <li>シンジケートカバーはリアルタイムでは公表されない。PO価格付近の出来高・板・歩み値で推測するだけ</li>
+        <li>自社株買いの株数・金額は上限。上限まで買わずに終わることも多い</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>③ 受渡日の売り方</summary>
+    <div class="body">
+      <p class="lead">PO株は受渡日（価格決定日の約5営業日後）から売れます。損を避けたいなら指値が基本です。</p>
+      <dl class="pair">
+        <div><dt>成り行き</dt><dd>値段を指定せず寄付きで売る。<span class="ok">確実に売れる</span>／<span class="ng">PO価格割れなら損</span></dd></div>
+        <div><dt>指値</dt><dd>PO価格＋手数料分以上で注文。<span class="ok">損はしない</span>／<span class="ng">届かなければ売れ残る</span></dd></div>
+        <div><dt>つなぎ売り</dt><dd>購入申込の後、信用で同じ株数を空売り→受渡日に現渡し。<span class="ok">値段を先に確定</span>／<span class="ng">信用口座・金利・貸株料・逆日歩の可能性。貸借銘柄のみ</span></dd></div>
+      </dl>
+      <p class="note">受渡日の朝に、前日終値・PTS・寄付き前の気配を見て、PO価格より上なら成り行き、下なら指値か様子見。売り注文は前日夜〜当日朝に出せる会社が多いので、受付時刻は各社で確認。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>④ よくある勘違いと注意点</summary>
+    <div class="body">
+      <p class="lead">一番多い勘違いは因果の逆読み。株価が先に動き、それを見て主幹事が買い戻すかを決めます。</p>
+      <dl class="pair">
+        <div><dt><span class="ng">✕</span> シンジケートカバーが無い→買いが無いから下がる</dt><dd><span class="ok">○</span> 株価が強くて買い戻しが要らなかった証拠</dd></div>
+        <div><dt><span class="ng">✕</span> PO価格を割れば必ず主幹事が買う</dt><dd><span class="ok">○</span> 主幹事の判断。量（OA上限）・期間（終了日まで）にも限りがある</dd></div>
+        <div><dt><span class="ng">✕</span> OAが0→配る株が減って当たりにくい</dt><dd><span class="ok">○</span> 需要が弱かったサイン。当たりやすいが、受渡日に損するリスクが高い</dd></div>
+        <div><dt><span class="ng">✕</span> つなぎ売りは値決め後に買い戻されて上がる</dt><dd><span class="ok">○</span> 当選者はPO株で返す。市場で買うのは落選者と普通の空売りだけ</dd></div>
+        <div><dt><span class="ng">✕</span> 結果は翌日にわかる</dt><dd><span class="ok">○</span> OA株数は価格決定日の夕方。シンジケートカバーは期間終了後、自社株買いは翌月初め</dd></div>
+      </dl>
+      <ul>
+        <li>PO発表後は5〜10%程度下がることが多い。それより大きく下げていれば、売りが出尽くし気味の可能性も、下げが続くリスクもある</li>
+        <li>相場急落時は、価格決定日の延期（決定期間内で後ずらし）や中止がありうる。中止なら申込は無効で損はない</li>
+        <li>抽選申込の取消・減額は締切まで。締切は価格決定日の午前中が多く、会社によっては前営業日に実質締まる</li>
+        <li>購入申込の期間は1〜2営業日と短い。申込を忘れると辞退扱い。購入申込後は取消・減額できない</li>
+      </ul>
+    </div>
+  </details>
+</section>
 
 <footer>配分率＝（ネット抽選分＋支店の売れ残り）×（1＋辞退率）÷ネット需要。予想配分は100株未満切り捨て。損益はPO価格基準。数字はすべて仮定で、投資判断はご自身で。</footer>
 </div>
