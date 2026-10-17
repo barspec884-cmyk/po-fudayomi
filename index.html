@@ -1,7 +1,9 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png?v=20261017-3"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PO札読み計算機</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&family=Shippori+Mincho:wght@700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 /* Layout: one column of stacked ledger steps (①→⑦) flowing into a sticky result slip */
@@ -26,7 +28,7 @@ header p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
 .seg{display:flex;gap:8px;flex-wrap:wrap}
 .seg button{flex:1;min-width:84px;font:inherit;font-size:.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
 .seg button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
-button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .seglabel{font-size:.8rem;color:var(--muted);margin:0 0 -6px}
 section.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
 section.step h2{margin:0;font-size:.95rem;display:flex;gap:8px;align-items:baseline}
@@ -36,7 +38,7 @@ section.step h2 b{font-family:var(--f-display);color:var(--gold);font-size:1.1re
 .row label{display:flex;justify-content:space-between;gap:6px;font-size:.85rem;color:var(--muted)}
 .row label output{font-family:var(--f-num);color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
 input[type=range]{width:100%;accent-color:var(--accent)}
-input[type=number],input[type=text]{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+input[type=number],input[type=text],select{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
 input[type=number]{font-family:var(--f-num)}
 .sub{font-size:.8rem;color:var(--muted);margin:0}
 .sub span{font-family:var(--f-num);color:var(--fg)}
@@ -53,22 +55,49 @@ input[type=number]{font-family:var(--f-num)}
 .neg{color:var(--bad)} .pos{color:var(--good)}
 footer{font-size:.75rem;color:var(--muted)}
 </style>
+</head>
+<body>
 
 <div class="wrap">
 <header>
   <h1>PO札読み計算機</h1>
-  <p>どの銘柄でも、ネット抽選で何株来るかを推定します。初期値はCKD(6407)の例です。</p>
+  <p>どの銘柄でも、ネット抽選で何株来るかを推定します。初期値は架空の例です。</p>
 </header>
 
 <section class="step">
   <h2><b>①</b>銘柄と自分の申込</h2>
   <div class="two">
-    <div class="row"><label for="name">銘柄名・コード</label><input type="text" id="name" value="CKD 6407"></div>
-    <div class="row"><label for="broker">申込先の証券会社</label><input type="text" id="broker" value="SMBC日興"></div>
+    <div class="row"><label for="name">銘柄名</label><input type="text" id="name" value="サンプル銘柄（架空）"></div>
+    <div class="row"><label for="code">証券コード</label><input type="text" id="code" value="0000" maxlength="5" inputmode="numeric" autocomplete="off"></div>
   </div>
   <div class="two">
-    <div class="row"><label for="price">株価（円）</label><input type="number" id="price" value="5060" step="10" inputmode="decimal"></div>
-    <div class="row"><label for="apply">申込株数</label><input type="number" id="apply" value="20000" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="broker">申込先の証券会社</label>
+      <select id="broker">
+        <optgroup label="対面系">
+          <option data-net="10" selected>野村證券</option>
+          <option data-net="10">大和証券</option>
+          <option data-net="10">SMBC日興証券</option>
+          <option data-net="10">みずほ証券</option>
+          <option data-net="10">三菱UFJモルガン・スタンレー証券</option>
+          <option data-net="10">岡三証券</option>
+          <option data-net="10">東海東京証券</option>
+        </optgroup>
+        <optgroup label="ネット系">
+          <option data-net="100">SBI証券</option>
+          <option data-net="100">楽天証券</option>
+          <option data-net="100">マネックス証券</option>
+          <option data-net="100">松井証券</option>
+          <option data-net="100">三菱UFJ eスマート証券</option>
+        </optgroup>
+        <option data-net="" value="__other">その他（手入力）</option>
+      </select>
+    </div>
+    <div class="row" id="otherRow" hidden><label for="brokerOther">証券会社名</label><input type="text" id="brokerOther" placeholder="例：〇〇証券"></div>
+  </div>
+  <p class="note">証券会社を選ぶと、④のネット抽選の割合に目安が入ります（対面系10%、ネット系100%）。</p>
+  <div class="two">
+    <div class="row"><label for="price">株価（円）</label><input type="number" id="price" value="3000" step="10" inputmode="decimal"></div>
+    <div class="row"><label for="apply">申込株数</label><input type="number" id="apply" value="1000" step="100" inputmode="numeric"></div>
   </div>
   <div class="row"><label for="disc">ディスカウント率 <output id="o_disc"></output></label><input type="range" id="disc" min="1" max="8" step="0.5" value="5"></div>
   <p class="sub">PO価格 <span id="r_po"></span></p>
@@ -77,8 +106,8 @@ footer{font-size:.75rem;color:var(--muted)}
 <section class="step">
   <h2><b>②</b>案件の規模</h2>
   <div class="two">
-    <div class="row"><label for="total">公募＋売出株数</label><input type="number" id="total" value="3570800" step="100" inputmode="numeric"></div>
-    <div class="row"><label for="oa">OA株数</label><input type="number" id="oa" value="535500" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="total">公募＋売出株数</label><input type="number" id="total" value="3000000" step="100" inputmode="numeric"></div>
+    <div class="row"><label for="oa">OA株数</label><input type="number" id="oa" value="450000" step="100" inputmode="numeric"></div>
   </div>
   <p class="note">目論見書やPO情報サイトの数字を入れてください。OAは主幹事だけが扱う前提です。</p>
 </section>
@@ -86,11 +115,11 @@ footer{font-size:.75rem;color:var(--muted)}
 <section class="step">
   <h2><b>③</b>申込先の立場</h2>
   <div class="seg" id="role" role="group" aria-label="申込先の立場">
-    <button data-share="55" data-lead="1">主幹事</button>
-    <button data-share="30" data-lead="0" class="on">共同主幹事</button>
+    <button data-share="55" data-lead="1" class="on">主幹事</button>
+    <button data-share="30" data-lead="0">共同主幹事</button>
     <button data-share="5" data-lead="0">副幹事・その他</button>
   </div>
-  <div class="row"><label for="share">引受シェア <output id="o_share"></output></label><input type="range" id="share" min="1" max="80" step="1" value="30"></div>
+  <div class="row"><label for="share">引受シェア <output id="o_share"></output></label><input type="range" id="share" min="1" max="80" step="1" value="55"></div>
   <p class="sub"><span id="r_bname"></span>に来る株数 <span id="r_nikko"></span></p>
 </section>
 
@@ -147,7 +176,7 @@ footer{font-size:.75rem;color:var(--muted)}
 const $=id=>document.getElementById(id);
 const fmt=n=>Math.round(n).toLocaleString('ja-JP');
 const man=n=>(n/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万円';
-let isLead=false;
+let isLead=true;
 const presets={hot:{people:4000,avg:1000,unsold:0},mid:{people:2000,avg:1000,unsold:0},cold:{people:1000,avg:800,unsold:17}};
 function declineFromDisc(d){ // 4%→15, 6%→5, linear, clamped
   return Math.max(0,Math.min(40,Math.round(15-(d-4)*5)));
@@ -163,7 +192,7 @@ function calc(){
   const base=net+spill, extra=base*decline, pool=base+extra, demand=people*avg;
   const ratio=demand>0?Math.min(1,pool/demand):0;
   const mine=Math.floor(apply*ratio/100)*100, cost=mine*po;
-  const bname=$('broker').value.trim()||'申込先';
+  const bname=brokerName()||'申込先';
   $('o_disc').textContent=disc.toFixed(1)+'%';
   $('o_share').textContent=$('share').value+'%';
   $('o_retail').textContent=$('retail').value+'%';
@@ -180,7 +209,8 @@ function calc(){
   $('r_spill').textContent=fmt(spill)+'株';
   $('r_demand').textContent=fmt(demand)+'株';
   $('r_extra').textContent=fmt(extra)+'株';
-  $('r_title').textContent=($('name').value.trim()||'銘柄')+' ／ '+bname;
+  const code=$('code').value.trim();
+  $('r_title').textContent=($('name').value.trim()||'銘柄')+(code?'（'+code+'）':'')+' ／ '+bname;
   $('r_ratio').textContent=(ratio*100).toFixed(1)+'%';
   $('r_mine').textContent=fmt(mine)+'株';
   $('r_cost').textContent=man(cost);
@@ -188,6 +218,16 @@ function calc(){
   $('r_m3').textContent='−'+man(cost*.03);
   $('r_p3').textContent='+'+man(cost*.03);
 }
+function brokerName(){
+  const sel=$('broker');
+  return sel.value==='__other'?$('brokerOther').value.trim():sel.value;
+}
+$('broker').addEventListener('change',()=>{
+  const opt=$('broker').selectedOptions[0];
+  $('otherRow').hidden=$('broker').value!=='__other';
+  if(opt.dataset.net){$('online').value=opt.dataset.net;}
+  calc();
+});
 function clearOn(group){document.querySelectorAll('#'+group+' button').forEach(b=>b.classList.remove('on'));}
 document.querySelectorAll('input').forEach(i=>i.addEventListener('input',e=>{
   const id=e.target.id;
@@ -208,5 +248,5 @@ document.querySelectorAll('#role button').forEach(b=>b.addEventListener('click',
 $('decline').value=declineFromDisc(+$('disc').value);
 calc();
 </script>
-
-</body></html>
+</body>
+</html>
