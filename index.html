@@ -53,6 +53,8 @@ input[type=number],input.num{font-family:var(--f-num);text-align:right}
 .numwrap{display:grid;grid-template-columns:34px minmax(0,1fr) 34px;gap:4px}
 .stp{font:inherit;font-size:1.05rem;line-height:1;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--accent);cursor:pointer;padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .stp:active{background:var(--line)}
+@media (max-width:560px){.two.numrow{grid-template-columns:1fr;gap:12px}.numwrap{grid-template-columns:44px minmax(0,1fr) 44px}.numwrap input{padding-block:9px}.stp{font-size:1.2rem}}
+[hidden]{display:none!important}
 .hint{font-size:.75rem;color:var(--muted);margin:0;text-align:right;min-height:1.2em}
 .hint b{color:var(--fg);font-weight:700}
 .hint.warn,.hint.warn b{color:var(--bad)}
@@ -100,7 +102,7 @@ footer{font-size:.75rem;color:var(--muted)}
   <div class="two">
     <div class="row"><label for="broker">申込先の証券会社</label>
       <select id="broker">
-        <option value="" data-net="" selected>（選択してください）</option>
+        <option value="" data-net="" selected>（未選択）</option>
         <optgroup label="対面系">
           <option data-net="10">野村證券</option>
           <option data-net="10">大和証券</option>
@@ -123,7 +125,7 @@ footer{font-size:.75rem;color:var(--muted)}
     <div class="row" id="otherRow" hidden><label for="brokerOther">証券会社名</label><input type="text" id="brokerOther" placeholder="例：〇〇証券"></div>
   </div>
   <p class="note">証券会社を選ぶと、④のネット抽選の割合に目安が入ります（対面系10%、ネット系100%）。</p>
-  <div class="two">
+  <div class="two numrow">
     <div class="row"><label for="price">株価（円）</label><div class="numwrap"><button type="button" class="stp" data-for="price" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="price" value="3,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="price" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_price"></p></div>
     <div class="row"><label for="apply">申込株数</label><div class="numwrap"><button type="button" class="stp" data-for="apply" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="apply" value="1,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="apply" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_apply"></p></div>
   </div>
@@ -133,7 +135,7 @@ footer{font-size:.75rem;color:var(--muted)}
 
 <section class="step">
   <h2><b>②</b>案件の規模</h2>
-  <div class="two">
+  <div class="two numrow">
     <div class="row"><label for="total">公募＋売出株数</label><div class="numwrap"><button type="button" class="stp" data-for="total" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="total" value="3,000,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="total" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_total"></p></div>
     <div class="row"><label for="oa">OA株数</label><div class="numwrap"><button type="button" class="stp" data-for="oa" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="oa" value="450,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="oa" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_oa"></p></div>
   </div>
