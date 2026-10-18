@@ -183,7 +183,9 @@ footer{font-size:.75rem;color:var(--muted)}
     <div class="row"><label for="apply">申込株数</label><div class="numwrap"><button type="button" class="stp" data-for="apply" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="apply" value="1,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="apply" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_apply"></p></div>
   </div>
   <div class="row"><label for="disc">ディスカウント率 <span class="discbox"><input type="text" id="discNum" class="num" inputmode="decimal" autocomplete="off" aria-label="ディスカウント率（%）">%</span></label><input type="range" id="disc" min="0" max="10" step="0.01" value="5"></div>
-  <input type="hidden" id="fixedPo" value="">
+  <input type="hidden" id="fixedPo" value=""><input type="hidden" id="dLo" value=""><input type="hidden" id="dHi" value="">
+  <p class="note" id="rangeNote"></p>
+  <button type="button" id="unrange" class="linkbtn" hidden>仮条件の幅の制限を外す（0〜10%に戻す）</button>
   <p class="sub">PO価格 <span id="r_po"></span><span class="stage" id="r_stage"></span></p>
   <p class="note" id="poNote"></p>
   <button type="button" id="unfix" class="linkbtn" hidden>確定を解除して予想に戻す</button>
@@ -413,7 +415,8 @@ document.querySelectorAll('.stp').forEach(b=>{
 
 /* ===== 保存まわり（ブラウザ内に3枠ぶん保存） ===== */
 const KEY='po-calc-slots-v1';
-const FIELDS=['name','code','broker','brokerOther','price','apply','disc','total','oa','share','retail','online','unsold','people','avg','decline','fixedPo'];
+const FIELDS=['name','code','broker','brokerOther','price','apply','disc','total','oa','share','retail','online','unsold','people','avg','decline','fixedPo','dLo','dHi'];
+const RESET_IF_MISSING=['fixedPo','dLo','dHi'];   // 古い保存データに無い項目は空に戻す
 let loading=false, storageOK=true;
 function readStore(){
   try{
@@ -433,7 +436,8 @@ function getState(){
 }
 function setState(s){
   loading=true;
-  FIELDS.forEach(id=>{if(s.f&&s.f[id]!==undefined)$(id).value=s.f[id]; else if(id==='fixedPo')$(id).value='';});
+  $('disc').min=0; $('disc').max=10;   // 前の枠の幅で値が削られないよう、先に全開にしてから入れる
+  FIELDS.forEach(id=>{if(s.f&&s.f[id]!==undefined)$(id).value=s.f[id]; else if(RESET_IF_MISSING.includes(id))$(id).value='';});
   Object.keys(NUMS).forEach(id=>formatNum($(id),false));
   $('otherRow').hidden=$('broker').value!=='__other';
   isLead=!!s.isLead;
@@ -479,6 +483,7 @@ function declineFromDisc(d){ // 4%→15, 6%→5, linear, clamped
   return Math.max(0,Math.min(40,Math.round(15-(d-4)*5)));
 }
 function calc(){
+  applyRange();
   const price=num('price'), disc=+$('disc').value, apply=num('apply');
   const total=num('total'), oa=num('oa'), share=+$('share').value/100;
   updateHints();
@@ -699,6 +704,13 @@ function applyPO(r){
   if(r.price!=null){$('price').value=group(String(Math.round(r.price)));done.push('株価');}
   if(r.disc!=null){$('disc').value=r.disc;$('decline').value=declineFromDisc(+$('disc').value);done.push('ディスカウント率');}
   if(r.isFix&&r.poPrice){$('fixedPo').value=String(Math.round(r.poPrice));done.push('PO価格（確定）');}
+  if(r.range){ // 仮条件（例：終値×0.94〜0.96 → 4〜6%）にスライダーの幅を合わせる
+    const lo=+((1-r.range[1])*100).toFixed(2), hi=+((1-r.range[0])*100).toFixed(2);
+    $('dLo').value=lo; $('dHi').value=hi;
+    const d=+$('disc').value;
+    if(r.disc==null&&(d<lo||d>hi)){const mid=+((lo+hi)/2).toFixed(2); $('disc').min=0;$('disc').max=10; $('disc').value=mid; $('decline').value=declineFromDisc(mid);}
+    done.push('仮条件の幅（'+lo.toFixed(2)+'〜'+hi.toFixed(2)+'%）');
+  }
   // 申込先の証券会社が主幹事なら③も合わせる
   let roleNote='';
   const bn=brokerName();
@@ -728,6 +740,19 @@ $('discNum').addEventListener('input',()=>{
 });
 $('discNum').addEventListener('blur',()=>{$('discNum').value=(+$('disc').value).toFixed(2);});
 $('unfix').addEventListener('click',()=>{$('fixedPo').value='';calc();});
+$('unrange').addEventListener('click',()=>{$('dLo').value='';$('dHi').value='';calc();});
+/* 仮条件の幅をスライダーに反映（未設定なら0〜10%） */
+function applyRange(){
+  const lo=parseFloat($('dLo').value), hi=parseFloat($('dHi').value);
+  const has=!isNaN(lo)&&!isNaN(hi)&&hi>lo;
+  const d=+$('disc').value;
+  $('disc').min=has?lo:0; $('disc').max=has?hi:10;
+  if(has&&(d<lo||d>hi)) $('disc').value=Math.min(hi,Math.max(lo,d));
+  $('rangeNote').textContent=has
+    ?'仮条件：ディスカウント '+lo.toFixed(2)+'〜'+hi.toFixed(2)+'%（売出しの開示より）。スライダーはこの幅だけ動きます。'
+    :'スライダーは0〜10%（よくある仮条件「終値×0.90〜1.00」の幅）。売出しの開示を読み込むと、その案件の幅に合わせます。';
+  $('unrange').hidden=!has||num('fixedPo')>0;   // 確定後は幅を触る必要がないので隠す
+}
 
 /* ===== 起動時 ===== */
 $('decline').value=declineFromDisc(+$('disc').value);
