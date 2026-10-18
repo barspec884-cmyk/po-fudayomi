@@ -72,6 +72,8 @@ input[type=number],input.num{font-family:var(--f-num);text-align:right}
 .grid3 span{font-family:var(--f-num);font-size:.85rem;font-variant-numeric:tabular-nums}
 .neg{color:var(--bad)} .pos{color:var(--good)}
 footer{font-size:.75rem;color:var(--muted)}
+.yflink{display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--accent);text-decoration:none}
+.yflink:hover{border-color:var(--accent)}
 /* ===== 開示PDFから自動入力 ===== */
 .pdfpick{display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:.9rem;font-weight:700;padding:12px;border-radius:8px;border:1.5px dashed var(--accent);background:var(--bg);color:var(--accent);cursor:pointer}
 .pdfpick:hover{background:var(--card)}
@@ -175,6 +177,7 @@ footer{font-size:.75rem;color:var(--muted)}
   </div>
   <div class="row"><label for="disc">ディスカウント率 <output id="o_disc"></output></label><input type="range" id="disc" min="1" max="8" step="0.5" value="5"></div>
   <p class="sub">PO価格 <span id="r_po"></span></p>
+  <a class="yflink" id="yfLink" target="_blank" rel="noopener" hidden>Yahoo!ファイナンスで株価を見る ↗</a>
 </section>
 
 <section class="step">
@@ -329,6 +332,7 @@ footer{font-size:.75rem;color:var(--muted)}
 
 <script>
 const $=id=>document.getElementById(id);
+const DEFAULT_CODE='0000';   // 初期値（架空）のコード。リンクは出さない
 const fmt=n=>Math.round(n).toLocaleString('ja-JP');
 const man=n=>(n/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万円';
 let isLead=true;
@@ -497,6 +501,11 @@ function calc(){
   $('r_demand').textContent=fmt(demand)+'株';
   $('r_extra').textContent=fmt(extra)+'株';
   const code=$('code').value.trim();
+  // 証券コードが入っていれば、Yahoo!ファイナンスの銘柄ページへのリンクを出す
+  const yc=toHalf(code).toUpperCase();
+  const yOK=/^[0-9][0-9A-Z]{3}$/.test(yc)&&yc!==DEFAULT_CODE;
+  $('yfLink').hidden=!yOK;
+  if(yOK){$('yfLink').href='https://finance.yahoo.co.jp/quote/'+yc+'.T';$('yfLink').textContent='Yahoo!ファイナンスで'+yc+'の株価を見る ↗';}
   $('r_title').textContent=($('name').value.trim()||'銘柄')+(code?'（'+code+'）':'')+' ／ '+bname;
   $('r_ratio').textContent=(ratio*100).toFixed(1)+'%';
   $('r_mine').textContent=fmt(mine)+'株';
