@@ -72,6 +72,23 @@ input[type=number],input.num{font-family:var(--f-num);text-align:right}
 .grid3 span{font-family:var(--f-num);font-size:.85rem;font-variant-numeric:tabular-nums}
 .neg{color:var(--bad)} .pos{color:var(--good)}
 footer{font-size:.75rem;color:var(--muted)}
+/* ===== 開示PDFから自動入力 ===== */
+.pdfpick{display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:.9rem;font-weight:700;padding:12px;border-radius:8px;border:1.5px dashed var(--accent);background:var(--bg);color:var(--accent);cursor:pointer}
+.pdfpick:hover{background:var(--card)}
+#pdfOut{display:grid;gap:10px}
+.pdfcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px;background:var(--bg)}
+.pdfcard .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pdfcard .ph b{font-size:.95rem}
+.pdfcard .ph small{font-size:.75rem;color:var(--gold);font-weight:700}
+.pdftbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.pdftbl td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
+.pdftbl td:first-child{color:var(--muted);white-space:nowrap;width:1%}
+.pdftbl td.v{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.pdftbl td.to{color:var(--accent);font-size:.75rem;white-space:nowrap;text-align:right;width:1%}
+.pdftbl tr.info td.v{font-family:var(--f-body)}
+.pdffill{font:inherit;font-size:.9rem;font-weight:700;padding:9px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--card);cursor:pointer}
+.pdfmsg{font-size:.8rem;margin:0;color:var(--good);font-weight:700}
+.pdfmsg.warn{color:var(--bad)}
 /* ===== 読み方メモ（折りたたみ） ===== */
 .memo{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:8px}
 .memo>h2{margin:0;font-size:.95rem;display:flex;gap:8px;align-items:baseline}
@@ -111,6 +128,13 @@ footer{font-size:.75rem;color:var(--muted)}
   </div>
   <p class="note" id="slotInfo"></p>
   <p class="note">入力した内容は自動でこのブラウザに保存され、次に開いたときもそのまま残ります。各枠の「×」でその銘柄だけ削除できます。スマホとパソコンでは別々に保存されます。</p>
+</section>
+
+<section class="step" id="pdfStep">
+  <h2><b>PDF</b>開示PDFから自動入力</h2>
+  <label class="pdfpick"><input type="file" id="pdfIn" accept="application/pdf,.pdf" multiple hidden>開示PDFを選ぶ（複数可）</label>
+  <p class="note">TDnetの「株式の売出しに関するお知らせ」「売出価格等の決定に関するお知らせ」などを選ぶと、株数・OA・株価・ディスカウント率を読み取ります。同じ銘柄の「売出しの開示」→「価格決定の開示」の順に入力すると、両方の数字が入ります。読み取りはこの端末の中だけで行い、PDFはどこにも送信されません。</p>
+  <div id="pdfOut"></div>
 </section>
 
 <section class="step">
@@ -524,6 +548,148 @@ document.querySelectorAll('#slots .slot').forEach(el=>{
     if(i===store.cur) setState(DEFAULTS); // 表示中の枠なら初期値に戻す
     else renderSlots();                   // 他の枠なら表示はそのまま
   });
+});
+
+/* ===== 開示PDFから自動入力 =====
+   PDFの文字を端末内（pdf.js）で取り出し、空白を詰めた1本の文字列にしてから、
+   決まった言い回し（「売出株式の種類及び数」「算定基準日及びその価格」など）を探して数字を拾う */
+const PDFJS='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+let pdfjsReady=null;
+function loadPdfjs(){
+  if(pdfjsReady) return pdfjsReady;
+  pdfjsReady=new Promise((ok,ng)=>{
+    const s=document.createElement('script'); s.src=PDFJS+'build/pdf.min.js';
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'build/pdf.worker.min.js';ok(window.pdfjsLib);};
+    s.onerror=()=>{pdfjsReady=null;ng(new Error('pdf.jsを読み込めませんでした（通信を確認してください）'));};
+    document.head.append(s);
+  });
+  return pdfjsReady;
+}
+async function pdfText(file){
+  const lib=await loadPdfjs();
+  const doc=await lib.getDocument({data:await file.arrayBuffer(),cMapUrl:PDFJS+'cmaps/',cMapPacked:true}).promise;
+  let t='';
+  for(let i=1;i<=doc.numPages;i++){
+    const c=await (await doc.getPage(i)).getTextContent();
+    t+=c.items.map(x=>x.str+(x.hasEOL?'\n':'')).join('')+'\n';
+  }
+  return t;
+}
+// 全角英数記号→半角、空白を全部詰める、注意書きを除く
+function compactText(t){
+  return t.replace(/[！-～]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/　/g,'').replace(/[‐－―−]/g,'-').replace(/〜/g,'~')
+    .replace(/\s+/g,'')
+    .replace(/ご注意:.*?行われません。/g,'');
+}
+const n0=s=>+String(s).replace(/,/g,'');
+function parsePO(raw){
+  const C=compactText(raw), r={};
+  r.isFix=/価格等の決定|価格の決定/.test(C.slice(0,400));
+  let m;
+  if(m=C.match(/会社名(.+?)代表者/)) r.name=m[1].replace(/株式会社|\(株\)/g,'');
+  if(m=C.match(/コード(?:番号)?:?([0-9][0-9A-Z]{3})/)) r.code=m[1];
+  // その位置がどの区分（OA／引受売出し／公募）の中かを、直前の見出しで判定
+  const KEYS={oa:['オーバーアロットメントによる売出'],uw:['買取引受けによる売出','買取引受による売出'],kobo:['新株式発行','募集株式','一般募集','公募による']};
+  const secAt=pos=>{
+    const b=C.slice(0,pos); let best=null,bi=-1;
+    for(const k in KEYS) for(const w of KEYS[k]){const i=b.lastIndexOf(w); if(i>bi){bi=i;best=k;}}
+    return best;
+  };
+  const shares={}, unit={}, totalAmt={};
+  for(const x of C.matchAll(/(?:種類及び数|売出株式数|募集株式数|発行新株式数|発行株式数)(?:当社普通株式)?([\d,]+)株/g)){
+    const s=secAt(x.index); if(s&&shares[s]==null) shares[s]=n0(x[1]);
+  }
+  for(const x of C.matchAll(/(?:売出|発行|募集)価格(?:\((?:募集|売出)価格\))?1株につき([\d,]+(?:\.\d+)?)円/g)){
+    const s=secAt(x.index); if(s&&unit[s]==null) unit[s]=n0(x[1]);
+  }
+  for(const x of C.matchAll(/(?:売出|発行|募集)価格の総額([\d,]+)円/g)){
+    const s=secAt(x.index); if(s&&totalAmt[s]==null) totalAmt[s]=n0(x[1]);
+  }
+  ['uw','kobo','oa'].forEach(s=>{ // 株数が書いていない時は「総額÷1株の価格」で求める
+    if(shares[s]==null&&unit[s]&&totalAmt[s]) shares[s]=Math.round(totalAmt[s]/unit[s]);
+  });
+  if(shares.uw!=null||shares.kobo!=null) r.total=(shares.uw||0)+(shares.kobo||0);
+  r.totalParts={uw:shares.uw,kobo:shares.kobo};
+  if(shares.oa!=null) r.oa=shares.oa;
+  r.poPrice=unit.uw||unit.kobo||unit.oa;
+  if(m=C.match(/算定基準日及びその価格.*?([\d,]+(?:\.\d+)?)円/)) r.price=n0(m[1]);
+  if(m=C.match(/ディスカウント率([\d.]+)%/)) r.disc=+m[1];
+  if(m=C.match(/([01]\.\d+)~([01]\.\d+)を乗じた価格/)) r.range=[+m[1],+m[2]];
+  if(m=C.match(/引受価額1株につき([\d,]+(?:\.\d+)?)円/)) r.uwPrice=n0(m[1]);
+  if(m=C.match(/(\d{4}年\d{1,2}月\d{1,2}日\(.\))から(\d{4}年\d{1,2}月\d{1,2}日\(.\))までの間のいずれかの日\(以下「(?:売出|発行)価格等決定日/)) r.fixDays=[m[1],m[2]];
+  if(m=C.match(/([^、。]{2,80}?)を(共同|単独)?主幹事会社/)){
+    r.leads=m[1].split(/及び|並びに|、/).map(s=>s.replace(/株式会社|\(株\)/g,'').trim()).filter(Boolean);
+    r.coLead=m[2]==='共同'||r.leads.length>1;
+  }
+  const oaAt=C.indexOf('オーバーアロットメントによる売出');
+  if(oaAt>=0&&(m=C.slice(oaAt).match(/売出人([^()「」、。]{2,30}?証券)株式会社/))) r.oaBy=m[1];
+  if(m=C.match(/申込期間(\d{4}年\d{1,2}月\d{1,2}日\(.\)(?:~\d{4}年\d{1,2}月\d{1,2}日\(.\))?)/)) r.apply=m[1];
+  if(m=C.match(/受渡期日(\d{4}年\d{1,2}月\d{1,2}日\(.\))(?:から(\d{4}年\d{1,2}月\d{1,2}日\(.\))までの間)?/)) r.deliver=m[2]?m[1]+'~'+m[2]:m[1];
+  return r;
+}
+const md=s=>s.replace(/^\d{4}年/,'').replace(/月/,'/').replace(/日/,'');
+function pdfCard(file,r){
+  const card=document.createElement('div'); card.className='pdfcard';
+  const rows=[], add=(k,v,to,info)=>rows.push('<tr'+(info?' class="info"':'')+'><td>'+k+'</td><td class="v">'+v+'</td><td class="to">'+(to||'')+'</td></tr>');
+  if(r.total!=null){
+    const p=[]; if(r.totalParts.kobo) p.push('公募'+fmt(r.totalParts.kobo)); if(r.totalParts.uw&&r.totalParts.kobo) p.push('売出'+fmt(r.totalParts.uw));
+    add('公募＋売出株数',fmt(r.total)+'株'+(p.length?'<br><small>（'+p.join('＋')+'）</small>':''),'→②');
+  }
+  if(r.oa!=null) add('OA株数',fmt(r.oa)+'株'+(r.isFix?'（確定）':'（上限）'),'→②');
+  if(r.price!=null) add('株価（算定基準日）',fmt(r.price)+'円','→①');
+  if(r.disc!=null) add('ディスカウント率',r.disc.toFixed(2)+'%','→①');
+  if(r.poPrice!=null) add('売出価格',fmt(r.poPrice)+'円'+(r.uwPrice?'<br><small>引受価額 '+r.uwPrice.toLocaleString('ja-JP')+'円（手数料 '+((1-r.uwPrice/r.poPrice)*100).toFixed(2)+'%）</small>':''),'',true);
+  if(r.range) add('仮条件','終値×'+r.range[0].toFixed(2)+'〜'+r.range[1].toFixed(2)+'<br><small>ディスカウント '+Math.round((1-r.range[1])*100)+'〜'+Math.round((1-r.range[0])*100)+'%</small>','',true);
+  if(r.fixDays) add('価格決定日',md(r.fixDays[0])+' 〜 '+md(r.fixDays[1]),'',true);
+  if(r.leads) add('主幹事',r.leads.join('・')+(r.coLead?'（共同）':'')+(r.oaBy?'<br><small>OAを扱う：'+r.oaBy+'</small>':''),'',true);
+  if(r.apply) add('申込期間',r.apply.split('~').map(md).join(' 〜 '),'',true);
+  if(r.deliver) add('受渡期日',r.deliver.split('~').map(md).join(' 〜 ')+(r.deliver.includes('~')?'<br><small>（このうちのいずれか）</small>':''),'',true);
+  const fillable=['total','oa','price','disc','name','code'].some(k=>r[k]!=null);
+  card.innerHTML='<div class="ph"><b></b><small>'+(r.isFix?'価格決定の開示':'売出しの開示')+'</small></div>'
+    +(rows.length?'<table class="pdftbl">'+rows.join('')+'</table>':'<p class="pdfmsg warn">数字を読み取れませんでした。POの開示PDFか確認してください。</p>')
+    +(fillable?'<button type="button" class="pdffill">この内容を入力する</button>':'')+'<p class="pdfmsg" hidden></p>';
+  card.querySelector('.ph b').textContent=(r.name||file.name)+(r.code?'（'+r.code+'）':'');
+  const btn=card.querySelector('.pdffill');
+  if(btn) btn.onclick=()=>{const msg=card.querySelector('.pdfmsg'); const t=applyPO(r); msg.hidden=false; msg.className='pdfmsg'+(t.warn?' warn':''); msg.textContent=t.text;};
+  return card;
+}
+function applyPO(r){
+  // 今の枠が別の銘柄なら、空き枠に入れる（無ければ確認）
+  const cur=$('code').value.trim(), def=DEFAULTS.f.code;
+  let moved='';
+  if(r.code&&cur&&cur!==def&&cur!==r.code){
+    const free=store.slots.findIndex(s=>!s);
+    if(free>=0){store.cur=free;writeStore();setState(DEFAULTS);moved='空き枠（枠'+(free+1)+'）に';}
+    else if(!confirm('今の枠は「'+$('name').value+'」です。この枠に上書きしますか？')) return {text:'入力をやめました。',warn:true};
+  }
+  const done=[];
+  if(r.name){$('name').value=r.name;}
+  if(r.code){$('code').value=r.code;}
+  if(r.total!=null){$('total').value=group(String(r.total));done.push('公募＋売出株数');}
+  if(r.oa!=null){$('oa').value=group(String(r.oa));done.push('OA株数');}
+  if(r.price!=null){$('price').value=group(String(Math.round(r.price)));done.push('株価');}
+  if(r.disc!=null){$('disc').value=r.disc;$('decline').value=declineFromDisc(+$('disc').value);done.push('ディスカウント率');}
+  // 申込先の証券会社が主幹事なら③も合わせる
+  let roleNote='';
+  const bn=brokerName();
+  if(bn&&r.leads){
+    const hit=s=>s&&(s.includes(bn)||bn.includes(s));
+    const btns=document.querySelectorAll('#role button');
+    if(hit(r.oaBy)||(!r.coLead&&r.leads.some(hit))){btns[0].click();roleNote='③を「主幹事」にしました。';}
+    else if(r.leads.some(hit)){btns[1].click();roleNote='③を「共同主幹事」にしました。';}
+  }
+  calc();
+  const sliderNote=(r.disc!=null&&Math.abs(+$('disc').value-r.disc)>0.001)?'（スライダーは'+(+$('disc').value).toFixed(1)+'%）':'';
+  return {text:moved+'入力しました：'+(done.join('・')||'銘柄名・コード')+sliderNote+'。'+roleNote};
+}
+$('pdfIn').addEventListener('change',async e=>{
+  const out=$('pdfOut'); const files=[...e.target.files]; e.target.value='';
+  for(const f of files){
+    const wait=document.createElement('p'); wait.className='note'; wait.textContent=f.name+' を読み取り中…'; out.prepend(wait);
+    try{ const r=parsePO(await pdfText(f)); wait.replaceWith(pdfCard(f,r)); }
+    catch(err){ wait.className='pdfmsg warn'; wait.textContent=f.name+'：'+(err.message||'読み取れませんでした'); }
+  }
 });
 
 /* ===== 起動時 ===== */
