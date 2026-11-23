@@ -182,6 +182,7 @@ footer{font-size:.75rem;color:var(--muted)}
     <div class="row"><label for="price">株価（円）</label><div class="numwrap"><button type="button" class="stp" data-for="price" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="price" value="3,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="price" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_price"></p></div>
     <div class="row"><label for="apply">申込株数</label><div class="numwrap"><button type="button" class="stp" data-for="apply" data-d="-1" aria-label="減らす">−</button><input type="text" class="num" id="apply" value="1,000" inputmode="numeric" autocomplete="off"><button type="button" class="stp" data-for="apply" data-d="1" aria-label="増やす">＋</button></div><p class="hint" id="h_apply"></p></div>
   </div>
+  <p class="sub">申込総額（株価×申込株数） <b id="r_applyTotal"></b> ／ PO価格で買う場合 <b id="r_applyPo"></b></p>
   <div class="row"><label for="disc">ディスカウント率 <span class="discbox"><input type="text" id="discNum" class="num" inputmode="decimal" autocomplete="off" aria-label="ディスカウント率（%）">%</span></label><input type="range" id="disc" min="0" max="10" step="0.01" value="5"></div>
   <div class="row"><label for="tick">PO価格の端数</label>
     <select id="tick">
@@ -531,6 +532,10 @@ function calc(){
   $('o_avg').textContent=fmt(avg)+'株';
   $('o_decline').textContent=$('decline').value+'%';
   $('r_po').textContent=yen(po)+'円';
+  // 申込総額：株価×申込株数（参考にPO価格×申込株数も出す）
+  const yenTotal=n=>fmt(n)+'円（'+man(n)+'）';
+  $('r_applyTotal').textContent=yenTotal(price*apply);
+  $('r_applyPo').textContent=yenTotal(po*apply);
   const sum=total+oa, size=sum*po;
   $('r_sum').textContent=fmt(sum)+'株（'+kanji(sum)+'株）';
   $('r_size').textContent=size>=1e8?'約'+(size/1e8).toLocaleString('ja-JP',{maximumFractionDigits:1})+'億円':man(size);
